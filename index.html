@@ -1,0 +1,1940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wizard's Quest - Level 1</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: white;
+            overflow: hidden;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 640px;
+            height: 360px;
+            overflow: hidden;
+            border: 4px solid #444;
+            box-shadow: 0 0 20px rgba(100, 50, 255, 0.5);
+        }
+        
+        #game-canvas {
+            background-color: #000;
+            image-rendering: pixelated;
+        }
+        
+        #game-ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            font-size: 16px;
+            text-shadow: 2px 2px 0 #000;
+        }
+        
+        #spell-meter {
+            position: absolute;
+            top: 35px;
+            left: 10px;
+            width: 100px;
+            height: 10px;
+            background-color: #333;
+            border: 2px solid #555;
+        }
+        
+        #spell-energy {
+            height: 100%;
+            width: 100%;
+            background-color: #5588FF;
+        }
+        
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        
+        h1 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #FFF;
+            text-shadow: 3px 3px 0 #5500FF;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #5500FF;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            box-shadow: 3px 3px 0 #3300AA;
+        }
+        
+        button:hover {
+            background-color: #6622FF;
+        }
+        
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0 #3300AA;
+        }
+        
+        .instructions {
+            margin-top: 20px;
+            font-size: 14px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        /* Mobile Controls */
+#mobile-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 80px;
+    display: none; /* Hidden by default, shown on mobile */
+    z-index: 150;
+}
+
+.control-button {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    background-color: rgba(85, 0, 255, 0.5);
+    border: 2px solid #5500FF;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-weight: bold;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.control-button:active {
+    background-color: rgba(120, 40, 255, 0.7);
+    transform: scale(1.1);
+}
+
+#left-btn {
+    bottom: 20px;
+    left: 20px;
+}
+
+#right-btn {
+    bottom: 20px;
+    left: 80px;
+}
+
+#jump-btn {
+    bottom: 20px;
+    right: 80px;
+}
+
+#spell-btn {
+    bottom: 20px;
+    right: 20px;
+}
+
+#switch-spell-btn {
+    bottom: 20px;
+    right: 140px;
+    font-size: 12px;
+}
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas" width="640" height="360"></canvas>
+        <div id="game-ui">
+            SCORE: <span id="score">0</span> | LIVES: <span id="lives">3</span> | LEVEL: <span id="level">1</span>
+            <div id="spell-meter"><div id="spell-energy"></div></div>
+        </div>
+        <div id="start-screen">
+            <h1>WIZARD'S QUEST</h1>
+            <button id="start-button">START LEVEL 1</button>
+            <div class="instructions">
+                <p>Arrow keys to move | SPACEBAR to jump</p>
+                <p>Z key to cast spells | X key to switch spell type</p>
+                <p>Jump on enemies to defeat them!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game Constants
+        const GRAVITY = 0.5;
+        const JUMP_FORCE = -12;
+        const PLAYER_SPEED = 4;
+        const SPELL_SPEED = 8;
+        const GROUND_HEIGHT = 40;
+        const ENEMY_SPEED = 1;
+        
+        // Canvas Setup
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const startScreen = document.getElementById('start-screen');
+        const startButton = document.getElementById('start-button');
+        const spellEnergyElement = document.getElementById('spell-energy');
+        
+        // Game assets (using pixel art created in code)
+        const COLORS = {
+            // Wizard colors
+            WIZARD_ROBE_PRIMARY: '#5500FF',
+            WIZARD_ROBE_SHADOW: '#3300AA',
+            WIZARD_ROBE_HIGHLIGHT: '#7722FF',
+            WIZARD_HAT_PRIMARY: '#3300AA',
+            WIZARD_HAT_TRIM: '#FFCC00',
+            WIZARD_SKIN_LIGHT: '#FFDDCC',
+            WIZARD_SKIN_SHADOW: '#EECCBB',
+            WIZARD_HAIR: '#111111',
+            WIZARD_BEARD: '#DDDDDD',
+            WIZARD_STAFF_WOOD: '#8B4513',
+            WIZARD_STAFF_GOLD: '#FFD700',
+            WIZARD_STAFF_GEM: '#FF00FF',
+            WIZARD_BOOTS: '#221111',
+            
+            // Spell colors
+            SPELL_FIRE_PRIMARY: '#FF5500',
+            SPELL_FIRE_CORE: '#FFEE00',
+            SPELL_FIRE_OUTER: '#CC3300',
+            SPELL_ICE_PRIMARY: '#00CCFF',
+            SPELL_ICE_CORE: '#FFFFFF',
+            SPELL_ICE_OUTER: '#0088AA',
+            
+            // Orc colors
+            ORC_SKIN_PRIMARY: '#66AA44',
+            ORC_SKIN_SHADOW: '#558833',
+            ORC_SKIN_HIGHLIGHT: '#77BB55',
+            ORC_ARMOR_PRIMARY: '#664433',
+            ORC_ARMOR_SHADOW: '#442211',
+            ORC_ARMOR_METAL: '#AAAAAA',
+            ORC_EYES: '#FF3300',
+            ORC_TEETH: '#FFFFEE',
+            ORC_BELT: '#993322',
+            
+            // Goblin colors
+            GOBLIN_SKIN_PRIMARY: '#AACC33',
+            GOBLIN_SKIN_SHADOW: '#99BB22',
+            GOBLIN_SKIN_HIGHLIGHT: '#BBDD44',
+            GOBLIN_CLOTHES_PRIMARY: '#665544',
+            GOBLIN_CLOTHES_SHADOW: '#443322',
+            GOBLIN_CLOTHES_ACCENT: '#AA8866',
+            GOBLIN_EYES: '#000000',
+            GOBLIN_TEETH: '#EEEEFF'
+        };
+        
+        // Game Variables
+        let player = {
+            x: 80,
+            y: 0,
+            width: 24,
+            height: 32,
+            velocityX: 0,
+            velocityY: 0,
+            isJumping: false,
+            isOnGround: false,
+            frame: 0,
+            frameCount: 0,
+            facingRight: true,
+            spellEnergy: 100,
+            spellType: 'fire', // 'fire' or 'ice'
+            spellRecoveryRate: 0.5,
+            invulnerable: 0
+        };
+        
+        let gameState = {
+    score: 0,
+    lives: 3,
+    level: 1, // Add this line
+    gameOver: false,
+    gameStarted: false,
+    camera: {
+        x: 0
+    },
+    platforms: [],
+    spells: [],
+    enemies: [],
+    particles: []
+            };
+        
+        // Keyboard Controls
+        const keys = {};
+        
+        // Game Loop Variables
+        let lastTime = 0;
+        let animationFrameId;
+        
+        // Event Listeners
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        startButton.addEventListener('click', () => {
+            startGame();
+        });
+        
+        // Game Initialization
+        function initGame() {
+    // Reset game state
+    gameState.score = 0;
+    gameState.lives = 3;
+    gameState.level = 1; // Add this line
+    gameState.gameOver = false;
+    gameState.camera.x = 0;
+    gameState.platforms = [];
+    gameState.spells = [];
+    gameState.enemies = [];
+    gameState.particles = [];
+    
+    // Reset player
+    player.x = 80;
+    player.y = 0;
+    player.velocityX = 0;
+    player.velocityY = 0;
+    player.isJumping = false;
+    player.isOnGround = false;
+    player.frame = 0;
+    player.frameCount = 0;
+    player.facingRight = true;
+    player.spellEnergy = 100;
+    player.spellType = 'fire';
+    player.invulnerable = 0;
+    
+    // Create level platforms
+    // Format: x, y, width, height
+    [
+        [0, canvas.height - GROUND_HEIGHT, 800, GROUND_HEIGHT],
+        [250, canvas.height - 120, 100, 20],
+        [400, canvas.height - 160, 120, 20],
+        [600, canvas.height - 200, 80, 20],
+        [800, canvas.height - GROUND_HEIGHT, 500, GROUND_HEIGHT],
+        [850, canvas.height - 120, 100, 20],
+        [1000, canvas.height - 180, 120, 20],
+        [1200, canvas.height - 150, 150, 20],
+        [1400, canvas.height - GROUND_HEIGHT, 800, GROUND_HEIGHT]
+    ].forEach(platform => {
+        gameState.platforms.push({
+            x: platform[0],
+            y: platform[1],
+            width: platform[2],
+            height: platform[3]
+        });
+    });
+    
+    // Create enemies
+    // Format: x, y, type, direction
+    [
+        [350, canvas.height - 160 - 32, 'goblin', -1],
+        [480, canvas.height - 160 - 32, 'goblin', -1],
+        [750, canvas.height - GROUND_HEIGHT - 48, 'orc', 1],
+        [900, canvas.height - 120 - 32, 'goblin', 1],
+        [1100, canvas.height - 180 - 32, 'goblin', -1],
+        [1250, canvas.height - 150 - 48, 'orc', -1],
+        [1500, canvas.height - GROUND_HEIGHT - 32, 'goblin', 1]
+    ].forEach(enemy => {
+        gameState.enemies.push({
+            x: enemy[0],
+            y: enemy[1],
+            width: enemy[2] === 'goblin' ? 24 : 30,
+            height: enemy[2] === 'goblin' ? 24 : 48,
+            type: enemy[2],
+            direction: enemy[3],
+            velocityX: enemy[3] * ENEMY_SPEED,
+            frame: 0,
+            frameCount: 0,
+            hp: enemy[2] === 'goblin' ? 1 : 2
+        });
+    });
+    
+    // Update UI
+    updateUI();
+}
+
+function initNextLevel() {
+    // Reset game entities but keep score and lives
+    gameState.camera.x = 0;
+    gameState.platforms = [];
+    gameState.spells = [];
+    gameState.enemies = [];
+    gameState.particles = [];
+    
+    // Reset player position
+    player.x = 80;
+    player.y = 0;
+    player.velocityX = 0;
+    player.velocityY = 0;
+    player.isJumping = false;
+    player.isOnGround = false;
+    player.frame = 0;
+    player.frameCount = 0;
+    player.facingRight = true;
+    player.spellEnergy = 100;
+    player.invulnerable = 0;
+    
+    // Create level platforms (using the same platform layout for simplicity)
+    [
+        [0, canvas.height - GROUND_HEIGHT, 800, GROUND_HEIGHT],
+        [250, canvas.height - 120, 100, 20],
+        [400, canvas.height - 160, 120, 20],
+        [600, canvas.height - 200, 80, 20],
+        [800, canvas.height - GROUND_HEIGHT, 500, GROUND_HEIGHT],
+        [850, canvas.height - 120, 100, 20],
+        [1000, canvas.height - 180, 120, 20],
+        [1200, canvas.height - 150, 150, 20],
+        [1400, canvas.height - GROUND_HEIGHT, 800, GROUND_HEIGHT]
+    ].forEach(platform => {
+        gameState.platforms.push({
+            x: platform[0],
+            y: platform[1],
+            width: platform[2],
+            height: platform[3]
+        });
+    });
+    
+    // Create enemies for the next level (more enemies and more orcs as level increases)
+    const baseEnemies = [
+        [350, canvas.height - 160 - 32, 'goblin', -1],
+        [480, canvas.height - 160 - 32, 'goblin', -1],
+        [750, canvas.height - GROUND_HEIGHT - 48, 'orc', 1],
+        [900, canvas.height - 120 - 32, 'goblin', 1],
+        [1100, canvas.height - 180 - 32, 'goblin', -1],
+        [1250, canvas.height - 150 - 48, 'orc', -1],
+        [1500, canvas.height - GROUND_HEIGHT - 32, 'goblin', 1]
+    ];
+    
+    // Add extra enemies based on level
+    for (let i = 0; i < Math.min(gameState.level, 10); i++) {
+        // Randomly choose a position
+        const x = 300 + Math.random() * 1200;
+        const y = canvas.height - (Math.random() > 0.5 ? 
+                    GROUND_HEIGHT - 48 : // Orc height
+                    [120, 160, 180, 200][Math.floor(Math.random() * 4)] - 32); // Goblin height on platforms
+        
+        // Higher chance of orcs in higher levels
+        const orcChance = 0.2 + (gameState.level * 0.05);
+        const type = Math.random() < orcChance ? 'orc' : 'goblin';
+        const direction = Math.random() > 0.5 ? 1 : -1;
+        
+        baseEnemies.push([x, y, type, direction]);
+    }
+    
+    // Create the enemy objects
+    baseEnemies.forEach(enemy => {
+        gameState.enemies.push({
+            x: enemy[0],
+            y: enemy[1],
+            width: enemy[2] === 'goblin' ? 24 : 30,
+            height: enemy[2] === 'goblin' ? 24 : 48,
+            type: enemy[2],
+            direction: enemy[3],
+            velocityX: enemy[3] * ENEMY_SPEED,
+            frame: 0,
+            frameCount: 0,
+            hp: enemy[2] === 'goblin' ? 1 : 2
+        });
+    });
+    
+    // Show new level message
+    const levelMessage = document.createElement('div');
+    levelMessage.style.position = 'absolute';
+    levelMessage.style.top = '50%';
+    levelMessage.style.left = '50%';
+    levelMessage.style.transform = 'translate(-50%, -50%)';
+    levelMessage.style.fontSize = '36px';
+    levelMessage.style.color = '#FFF';
+    levelMessage.style.textShadow = '3px 3px 0 #5500FF';
+    levelMessage.style.zIndex = '150';
+    levelMessage.textContent = `LEVEL ${gameState.level}`;
+    document.getElementById('game-container').appendChild(levelMessage);
+    
+    // Remove message after a delay
+    setTimeout(() => {
+        levelMessage.remove();
+    }, 2000);
+    
+    // Update UI
+    updateUI();
+}
+        
+        function startGame() {
+            startScreen.style.display = 'none';
+            gameState.gameStarted = true;
+            initGame();
+            
+            // Cancel any existing animation frame
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            
+            // Start the game loop
+            lastTime = performance.now();
+            gameLoop(lastTime);
+        }
+        
+        // Game Loop
+        function gameLoop(currentTime) {
+            // Calculate delta time
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Update game state
+            update();
+            
+            // Render game
+            render();
+            
+            // Continue loop if game is not over
+            if (!gameState.gameOver) {
+                animationFrameId = requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        function update() {
+    if (gameState.gameStarted && !gameState.gameOver) {
+        updatePlayer();
+        updateSpells();
+        updateEnemies();
+        updateParticles();
+        checkLevelComplete(); // Add this line
+            }
+        }
+
+        function checkLevelComplete() {
+    // Check if all visible enemies are defeated
+    // This ensures that even if some enemies are off-screen but technically still exist,
+    // the level can still be completed when the player defeats all the enemies they can see
+    
+    let visibleEnemies = false;
+    
+    // First check if there are any enemies at all
+    if (gameState.enemies.length === 0) {
+        // No enemies at all, level is complete
+        completeLevel();
+        return;
+    }
+    
+    // Then check if there are any enemies visible or within reach
+    const cameraLeft = gameState.camera.x - 100;
+    const cameraRight = gameState.camera.x + canvas.width + 100;
+    
+    for (let enemy of gameState.enemies) {
+        // Check if enemy is visible or in the player area
+        if (enemy.x + enemy.width >= cameraLeft && enemy.x <= cameraRight) {
+            visibleEnemies = true;
+            break;
+        }
+    }
+    
+    // If there are no visible enemies, but there are still enemies in the array,
+    // let's check if they're all far away (left behind)
+    if (!visibleEnemies) {
+        // Find rightmost platform
+        let rightmostPlatform = 0;
+        for (let platform of gameState.platforms) {
+            rightmostPlatform = Math.max(rightmostPlatform, platform.x + platform.width);
+        }
+        
+        // Check if player is near the end of the level
+        if (player.x > rightmostPlatform - 200) {
+            // Player is near the end, complete the level
+            completeLevel();
+        } else {
+            // Reset any enemies that are unreachable
+            resetUnreachableEnemies();
+        }
+    }
+}
+
+function completeLevel() {
+    // Add bonus for completing the level
+    gameState.score += 500;
+
+    // Show level complete message
+    const message = document.createElement('div');
+    message.style.position = 'absolute';
+    message.style.top = '50%';
+    message.style.left = '50%';
+    message.style.transform = 'translate(-50%, -50%)';
+    message.style.fontSize = '36px';
+    message.style.color = '#FFF';
+    message.style.textShadow = '3px 3px 0 #5500FF';
+    message.style.zIndex = '150';
+    message.textContent = `LEVEL ${gameState.level} COMPLETE!`;
+    document.getElementById('game-container').appendChild(message);
+    
+    // Clear any remaining enemies
+    gameState.enemies = [];
+    
+    // Increment level before starting next level
+    const nextLevel = gameState.level + 1;
+    
+    // Check if we've reached the maximum level
+    if (nextLevel <= 69) {
+        // Start next level after a delay
+        setTimeout(() => {
+            message.remove();
+            gameState.level = nextLevel; // Explicitly set next level
+            updateUI(); // Update UI to show new level
+            initNextLevel();
+        }, 2000);
+    } else {
+        // Player has reached beyond level 69 - show game completion message
+        setTimeout(() => {
+            message.remove();
+            const finalMessage = document.createElement('div');
+            finalMessage.style.position = 'absolute';
+            finalMessage.style.top = '50%';
+            finalMessage.style.left = '50%';
+            finalMessage.style.transform = 'translate(-50%, -50%)';
+            finalMessage.style.fontSize = '36px';
+            finalMessage.style.color = '#FFF';
+            finalMessage.style.textShadow = '3px 3px 0 #5500FF';
+            finalMessage.style.zIndex = '150';
+            finalMessage.style.textAlign = 'center';
+            finalMessage.innerHTML = `CONGRATULATIONS!<br>YOU HAVE COMPLETED<br>ALL 69 LEVELS!<br>FINAL SCORE: ${gameState.score}`;
+            document.getElementById('game-container').appendChild(finalMessage);
+            
+            // Show start screen after a delay
+            setTimeout(() => {
+                finalMessage.remove();
+                gameState.gameOver = true;
+                startScreen.style.display = 'flex';
+                startButton.textContent = 'PLAY AGAIN';
+            }, 5000);
+        }, 2000);
+    }
+}
+
+function resetUnreachableEnemies() {
+    // For any enemies that are off-screen to the left and unreachable,
+    // teleport them ahead of the player so they can be defeated
+    const safeX = player.x + canvas.width + 50; // Place them ahead of the player
+    
+    for (let enemy of gameState.enemies) {
+        if (enemy.x + enemy.width < gameState.camera.x - 200) {
+            // This enemy is far off-screen to the left, move it ahead
+            enemy.x = safeX + Math.random() * 100;
+            
+            // Make sure it's on a platform
+            let placed = false;
+            for (let platform of gameState.platforms) {
+                if (enemy.x > platform.x && enemy.x < platform.x + platform.width) {
+                    enemy.y = platform.y - enemy.height;
+                    placed = true;
+                    break;
+                }
+            }
+            
+            // If no suitable platform found, put them on the ground
+            if (!placed) {
+                enemy.y = canvas.height - GROUND_HEIGHT - enemy.height;
+            }
+        }
+    }
+}
+
+// Also fix the updateEnemies function to ensure enemies can't leave map boundaries
+function updateEnemies() {
+    for (let i = 0; i < gameState.enemies.length; i++) {
+        const enemy = gameState.enemies[i];
+        
+        // Only update enemies that are on screen or close to it
+        if (
+            enemy.x < gameState.camera.x - 100 || 
+            enemy.x > gameState.camera.x + canvas.width + 100
+        ) {
+            continue;
+        }
+        
+        // Store the original position
+        const originalX = enemy.x;
+        
+        // Move enemy
+        enemy.x += enemy.velocityX;
+        
+        // BOUNDARY CHECK: Prevent enemies from leaving the map
+        if (enemy.x < 0) {
+            enemy.x = 0;
+            enemy.velocityX = Math.abs(enemy.velocityX); // Force movement to the right
+        }
+        
+        // Find rightmost platform edge to determine map boundary
+        let rightmostPlatformEdge = 0;
+        for (let platform of gameState.platforms) {
+            rightmostPlatformEdge = Math.max(rightmostPlatformEdge, platform.x + platform.width);
+        }
+        
+        // Prevent going beyond the rightmost platform
+        if (enemy.x + enemy.width > rightmostPlatformEdge) {
+            enemy.x = rightmostPlatformEdge - enemy.width;
+            enemy.velocityX = -Math.abs(enemy.velocityX); // Force movement to the left
+        }
+        
+        // Animate enemy
+        enemy.frameCount++;
+        if (enemy.frameCount > 10) {
+            enemy.frame = (enemy.frame + 1) % 2;
+            enemy.frameCount = 0;
+        }
+        
+        // Simple platform edge detection
+        let onPlatform = false;
+        let hitWall = false;
+        
+        for (let platform of gameState.platforms) {
+            // Check if enemy is on this platform
+            if (
+                enemy.x + enemy.width > platform.x &&
+                enemy.x < platform.x + platform.width &&
+                enemy.y + enemy.height >= platform.y &&
+                enemy.y + enemy.height <= platform.y + 5
+            ) {
+                onPlatform = true;
+                
+                // Check if about to walk off edge
+                if (
+                    (enemy.velocityX < 0 && enemy.x <= platform.x) ||
+                    (enemy.velocityX > 0 && enemy.x + enemy.width >= platform.x + platform.width)
+                ) {
+                    enemy.velocityX *= -1;
+                }
+            }
+            
+            // Check if enemy hit a wall
+            if (
+                ((enemy.velocityX < 0 && enemy.x <= platform.x + platform.width && originalX > platform.x + platform.width) ||
+                (enemy.velocityX > 0 && enemy.x + enemy.width >= platform.x && originalX + enemy.width < platform.x)) &&
+                enemy.y + enemy.height > platform.y &&
+                enemy.y < platform.y + platform.height
+            ) {
+                hitWall = true;
+            }
+        }
+        
+        if (hitWall) {
+            enemy.velocityX *= -1;
+        }
+        
+        // Check collision with player
+        if (
+            player.x + player.width > enemy.x &&
+            player.x < enemy.x + enemy.width &&
+            player.y + player.height > enemy.y &&
+            player.y < enemy.y + enemy.height
+        ) {
+            // Player is falling onto enemy (jump attack)
+            if (player.velocityY > 0 && player.y + player.height < enemy.y + enemy.height / 2) {
+                enemy.hp--;
+                player.velocityY = JUMP_FORCE / 1.5; // Bounce off enemy
+                
+                // Add jump attack particles
+                for (let k = 0; k < 8; k++) {
+                    addParticle(
+                        enemy.x + enemy.width / 2, 
+                        enemy.y, 
+                        (Math.random() - 0.5) * 3, 
+                        -Math.random() * 4,
+                        enemy.type === 'goblin' ? COLORS.GOBLIN_SKIN_PRIMARY : COLORS.ORC_SKIN_PRIMARY,
+                        15 + Math.random() * 10
+                    );
+                }
+                
+                // Check if enemy is defeated
+                if (enemy.hp <= 0) {
+                    gameState.score += enemy.type === 'goblin' ? 100 : 200;
+                    gameState.enemies.splice(i, 1);
+                    i--;
+                    
+                    // Add death particles
+                    for (let k = 0; k < 15; k++) {
+                        addParticle(
+                            enemy.x + enemy.width / 2, 
+                            enemy.y + enemy.height / 2, 
+                            (Math.random() - 0.5) * 5, 
+                            (Math.random() - 0.5) * 5,
+                            enemy.type === 'goblin' ? COLORS.GOBLIN_SKIN_PRIMARY : COLORS.ORC_SKIN_PRIMARY,
+                            20 + Math.random() * 20
+                        );
+                    }
+                }
+                
+                updateUI();
+            } 
+            // Player collided with enemy (took damage)
+            else if (player.invulnerable <= 0) {
+                playerDie();
+            }
+        }
+    }
+}
+
+        
+        // Update functions
+        function updatePlayer() {
+            // Horizontal movement
+            if (keys['ArrowLeft']) {
+                player.velocityX = -PLAYER_SPEED;
+                player.facingRight = false;
+                player.frameCount++;
+            } else if (keys['ArrowRight']) {
+                player.velocityX = PLAYER_SPEED;
+                player.facingRight = true;
+                player.frameCount++;
+            } else {
+                player.velocityX = 0;
+                player.frameCount = 0;
+                player.frame = 0;
+            }
+            
+            // Jumping
+            if ((keys[' '] || keys['ArrowUp']) && player.isOnGround) {
+                player.velocityY = JUMP_FORCE;
+                player.isJumping = true;
+                player.isOnGround = false;
+            }
+            
+            // Cast spell
+            if (keys['z'] && player.spellEnergy >= 20) {
+                castSpell();
+                keys['z'] = false;  // Prevent continuous casting
+            }
+            
+            // Switch spell type
+            if (keys['x']) {
+                player.spellType = player.spellType === 'fire' ? 'ice' : 'fire';
+                keys['x'] = false; // Prevent continuous switching
+            }
+            
+            // Animation
+            if (player.frameCount > 5) {
+                player.frame = (player.frame + 1) % 4;
+                player.frameCount = 0;
+            }
+            
+            // Apply gravity
+            player.velocityY += GRAVITY;
+            
+            // Move player
+            player.x += player.velocityX;
+            player.y += player.velocityY;
+            
+            // Spell energy recovery
+            if (player.spellEnergy < 100) {
+                player.spellEnergy += player.spellRecoveryRate;
+                if (player.spellEnergy > 100) player.spellEnergy = 100;
+                spellEnergyElement.style.width = player.spellEnergy + '%';
+            }
+            
+            // Invulnerability frames
+            if (player.invulnerable > 0) {
+                player.invulnerable--;
+            }
+            
+            // Collision detection with platforms
+            player.isOnGround = false;
+            for (let platform of gameState.platforms) {
+                if (
+                    player.x + player.width > platform.x &&
+                    player.x < platform.x + platform.width &&
+                    player.y + player.height > platform.y &&
+                    player.y + player.height < platform.y + platform.height / 2 &&
+                    player.velocityY > 0
+                ) {
+                    player.isOnGround = true;
+                    player.velocityY = 0;
+                    player.y = platform.y - player.height;
+                    break;
+                }
+            }
+            
+            // Camera follows player
+            gameState.camera.x = player.x - canvas.width / 3;
+            
+            // Prevent player from going off the left edge
+            if (player.x < 0) {
+                player.x = 0;
+            }
+            
+            // Check for falling off the screen
+            if (player.y > canvas.height) {
+                playerDie();
+            }
+        }
+        
+        function castSpell() {
+            if (player.spellEnergy < 20) return;
+            
+            player.spellEnergy -= 20;
+            spellEnergyElement.style.width = player.spellEnergy + '%';
+            
+            const spellWidth = 20;
+            const spellHeight = 12;
+            
+            const spell = {
+                x: player.facingRight ? player.x + player.width : player.x - spellWidth,
+                y: player.y + 10,
+                width: spellWidth,
+                height: spellHeight,
+                velocityX: player.facingRight ? SPELL_SPEED : -SPELL_SPEED,
+                type: player.spellType,
+                frame: 0,
+                frameCount: 0
+            };
+            
+            gameState.spells.push(spell);
+            
+            // Add casting particles
+            for (let i = 0; i < 12; i++) {
+                addParticle(
+                    spell.x + (player.facingRight ? 0 : spell.width), 
+                    spell.y + spell.height/2, 
+                    (Math.random() - 0.5) * 4 + (player.facingRight ? 1 : -1), 
+                    (Math.random() - 0.5) * 4,
+                    player.spellType === 'fire' ? COLORS.SPELL_FIRE_CORE : COLORS.SPELL_ICE_CORE,
+                    10 + Math.random() * 15
+                );
+            }
+        }
+        
+        function updateSpells() {
+            for (let i = gameState.spells.length - 1; i >= 0; i--) {
+                const spell = gameState.spells[i];
+                
+                // Move spell
+                spell.x += spell.velocityX;
+                
+                // Animate spell
+                spell.frameCount++;
+                if (spell.frameCount > 3) {
+                    spell.frame = (spell.frame + 1) % 4;
+                    spell.frameCount = 0;
+                }
+                
+                // Add trailing particles for more visual effect
+                if (spell.frameCount % 2 === 0) {
+                    addParticle(
+                        spell.x + (spell.velocityX > 0 ? 0 : spell.width), 
+                        spell.y + spell.height/2, 
+                        (Math.random() - 0.5) * 2, 
+                        (Math.random() - 0.5) * 2,
+                        spell.type === 'fire' ? COLORS.SPELL_FIRE_OUTER : COLORS.SPELL_ICE_OUTER,
+                        10 + Math.random() * 15
+                    );
+                }
+                
+                // Remove spells that go off screen
+                if (
+                    spell.x < gameState.camera.x - 100 || 
+                    spell.x > gameState.camera.x + canvas.width + 100
+                ) {
+                    gameState.spells.splice(i, 1);
+                    continue;
+                }
+                
+                // Check for collision with enemies
+                for (let j = gameState.enemies.length - 1; j >= 0; j--) {
+                    const enemy = gameState.enemies[j];
+                    
+                    if (
+                        spell.x + spell.width > enemy.x &&
+                        spell.x < enemy.x + enemy.width &&
+                        spell.y + spell.height > enemy.y &&
+                        spell.y < enemy.y + enemy.height
+                    ) {
+                        // Hit enemy
+                        enemy.hp--;
+                        
+                        // Add hit particles
+                        for (let k = 0; k < 15; k++) {
+                            addParticle(
+                                spell.x + spell.width/2, 
+                                spell.y + spell.height/2, 
+                                (Math.random() - 0.5) * 6, 
+                                (Math.random() - 0.5) * 6,
+                                spell.type === 'fire' ? COLORS.SPELL_FIRE_PRIMARY : COLORS.SPELL_ICE_PRIMARY,
+                                15 + Math.random() * 20
+                            );
+                            
+                            // Add core particles (brighter)
+                            if (k < 6) {
+                                addParticle(
+                                    spell.x + spell.width/2, 
+                                    spell.y + spell.height/2, 
+                                    (Math.random() - 0.5) * 4, 
+                                    (Math.random() - 0.5) * 4,
+                                    spell.type === 'fire' ? COLORS.SPELL_FIRE_CORE : COLORS.SPELL_ICE_CORE,
+                                    10 + Math.random() * 15
+                                );
+                            }
+                        }
+                        
+                        // Remove spell
+                        gameState.spells.splice(i, 1);
+                        
+                        // Check if enemy is defeated
+                        if (enemy.hp <= 0) {
+                            gameState.score += enemy.type === 'goblin' ? 100 : 200;
+                            gameState.enemies.splice(j, 1);
+                            
+                            // Add death particles
+                            for (let k = 0; k < 25; k++) {
+                                addParticle(
+                                    enemy.x + enemy.width / 2, 
+                                    enemy.y + enemy.height / 2, 
+                                    (Math.random() - 0.5) * 8, 
+                                    (Math.random() - 0.5) * 8,
+                                    enemy.type === 'goblin' ? COLORS.GOBLIN_SKIN_PRIMARY : COLORS.ORC_SKIN_PRIMARY,
+                                    30 + Math.random() * 30
+                                );
+                                
+                                // Add armor/clothes particles
+                                if (k % 3 === 0) {
+                                    addParticle(
+                                        enemy.x + enemy.width / 2 + (Math.random() - 0.5) * 10, 
+                                        enemy.y + enemy.height / 2 + (Math.random() - 0.5) * 10, 
+                                        (Math.random() - 0.5) * 6, 
+                                        (Math.random() - 0.5) * 6,
+                                        enemy.type === 'goblin' ? COLORS.GOBLIN_CLOTHES_PRIMARY : COLORS.ORC_ARMOR_PRIMARY,
+                                        25 + Math.random() * 25
+                                    );
+                                }
+                            }
+                        }
+                        
+                        updateUI();
+                        break;
+                    }
+                }
+            }
+        }
+        
+        function updateEnemies() {
+            for (let i = 0; i < gameState.enemies.length; i++) {
+                const enemy = gameState.enemies[i];
+                
+                // Only update enemies that are on screen or close to it
+                if (
+                    enemy.x < gameState.camera.x - 100 || 
+                    enemy.x > gameState.camera.x + canvas.width + 100
+                ) {
+                    continue;
+                }
+                
+                // Move enemy
+                enemy.x += enemy.velocityX;
+                
+                // Animate enemy
+                enemy.frameCount++;
+                if (enemy.frameCount > 10) {
+                    enemy.frame = (enemy.frame + 1) % 2;
+                    enemy.frameCount = 0;
+                }
+                
+                // Simple platform edge detection
+                let onPlatform = false;
+                let hitWall = false;
+                
+                for (let platform of gameState.platforms) {
+                    // Check if enemy is on this platform
+                    if (
+                        enemy.x + enemy.width > platform.x &&
+                        enemy.x < platform.x + platform.width &&
+                        enemy.y + enemy.height >= platform.y &&
+                        enemy.y + enemy.height <= platform.y + 5
+                    ) {
+                        onPlatform = true;
+                        
+                        // Check if about to walk off edge
+                        if (
+                            (enemy.velocityX < 0 && enemy.x <= platform.x) ||
+                            (enemy.velocityX > 0 && enemy.x + enemy.width >= platform.x + platform.width)
+                        ) {
+                            enemy.velocityX *= -1;
+                        }
+                    }
+                    
+                    // Check if enemy hit a wall
+                    if (
+                        ((enemy.velocityX < 0 && enemy.x <= platform.x + platform.width && enemy.x >= platform.x) ||
+                        (enemy.velocityX > 0 && enemy.x + enemy.width >= platform.x && enemy.x + enemy.width <= platform.x + platform.width)) &&
+                        enemy.y + enemy.height > platform.y &&
+                        enemy.y < platform.y + platform.height
+                    ) {
+                        hitWall = true;
+                    }
+                }
+                
+                if (hitWall) {
+                    enemy.velocityX *= -1;
+                }
+                
+                // Check collision with player
+                if (
+                    player.x + player.width > enemy.x &&
+                    player.x < enemy.x + enemy.width &&
+                    player.y + player.height > enemy.y &&
+                    player.y < enemy.y + enemy.height
+                ) {
+                    // Player is falling onto enemy (jump attack)
+                    if (player.velocityY > 0 && player.y + player.height < enemy.y + enemy.height / 2) {
+                        enemy.hp--;
+                        player.velocityY = JUMP_FORCE / 1.5; // Bounce off enemy
+                        
+                        // Add jump attack particles
+                        for (let k = 0; k < 8; k++) {
+                            addParticle(
+                                enemy.x + enemy.width / 2, 
+                                enemy.y, 
+                                (Math.random() - 0.5) * 3, 
+                                -Math.random() * 4,
+                                enemy.type === 'goblin' ? COLORS.GOBLIN_SKIN : COLORS.ORC_SKIN,
+                                15 + Math.random() * 10
+                            );
+                        }
+                        
+                        // Check if enemy is defeated
+                        if (enemy.hp <= 0) {
+                            gameState.score += enemy.type === 'goblin' ? 100 : 200;
+                            gameState.enemies.splice(i, 1);
+                            i--;
+                            
+                            // Add death particles
+                            for (let k = 0; k < 15; k++) {
+                                addParticle(
+                                    enemy.x + enemy.width / 2, 
+                                    enemy.y + enemy.height / 2, 
+                                    (Math.random() - 0.5) * 5, 
+                                    (Math.random() - 0.5) * 5,
+                                    enemy.type === 'goblin' ? COLORS.GOBLIN_SKIN : COLORS.ORC_SKIN,
+                                    20 + Math.random() * 20
+                                );
+                            }
+                        }
+                        
+                        updateUI();
+                    } 
+                    // Player collided with enemy (took damage)
+                    else if (player.invulnerable <= 0) {
+                        playerDie();
+                    }
+                }
+            }
+        }
+        
+        function updateParticles() {
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                const particle = gameState.particles[i];
+                
+                // Move particle
+                particle.x += particle.velocityX;
+                particle.y += particle.velocityY;
+                
+                // Fade out
+                particle.life--;
+                
+                // Remove dead particles
+                if (particle.life <= 0) {
+                    gameState.particles.splice(i, 1);
+                }
+            }
+        }
+        
+        function addParticle(x, y, vx, vy, color, life) {
+            gameState.particles.push({
+                x, y,
+                velocityX: vx,
+                velocityY: vy,
+                color: color,
+                size: 3 + Math.random() * 3,
+                life: life
+            });
+        }
+        
+        function playerDie() {
+            if (player.invulnerable > 0) return;
+            
+            gameState.lives--;
+            player.invulnerable = 60; // Invulnerable for 60 frames
+            
+            // Add death particles
+            for (let i = 0; i < 20; i++) {
+                addParticle(
+                    player.x + player.width / 2, 
+                    player.y + player.height / 2, 
+                    (Math.random() - 0.5) * 6, 
+                    (Math.random() - 0.5) * 6,
+                    COLORS.WIZARD_ROBE,
+                    30 + Math.random() * 20
+                );
+            }
+            
+            // Reset player position for level 1
+            player.x = 80;
+            player.y = 0;
+            player.velocityX = 0;
+            player.velocityY = 0;
+            
+            updateUI();
+            
+            // Check game over
+            if (gameState.lives <= 0) {
+                gameOver();
+            }
+        }
+        
+        function gameOver() {
+            gameState.gameOver = true;
+            startScreen.style.display = 'flex';
+            startButton.textContent = 'TRY AGAIN';
+        }
+        
+        // Drawing functions
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = '#000033';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw background with parallax effect
+            drawBackground();
+            
+            // Save context for camera transform
+            ctx.save();
+            ctx.translate(-Math.floor(gameState.camera.x), 0);
+            
+            // Draw platforms
+            for (const platform of gameState.platforms) {
+                // Only draw platforms that are visible
+                if (
+                    platform.x + platform.width < gameState.camera.x || 
+                    platform.x > gameState.camera.x + canvas.width
+                ) {
+                    continue;
+                }
+                
+                // Draw ground with grass
+                if (platform.height === GROUND_HEIGHT) {
+                    ctx.fillStyle = '#553311'; // Dirt
+                    ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    
+                    // Grass top
+                    ctx.fillStyle = '#225522'; // Dark grass
+                    ctx.fillRect(platform.x, platform.y, platform.width, 8);
+                    ctx.fillStyle = '#338833'; // Light grass
+                    ctx.fillRect(platform.x, platform.y, platform.width, 3);
+                    
+                    // Dirt texture (random dots)
+                    ctx.fillStyle = '#442200';
+                    for (let i = 0; i < platform.width / 10; i++) {
+                        const dotX = platform.x + i * 10 + Math.random() * 10;
+                        const dotY = platform.y + 12 + Math.random() * (platform.height - 16);
+                        const dotSize = 1 + Math.random() * 2;
+                        ctx.fillRect(dotX, dotY, dotSize, dotSize);
+                    }
+                } 
+                // Draw floating platforms
+                else {
+                    // Main platform
+                    ctx.fillStyle = '#886633';
+                    ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    
+                    // Top grass
+                    ctx.fillStyle = '#225522';
+                    ctx.fillRect(platform.x, platform.y, platform.width, 3);
+                    
+                    // Bottom of platform
+                    ctx.fillStyle = '#774422';
+                    ctx.fillRect(platform.x, platform.y + platform.height - 3, platform.width, 3);
+                    
+                    // Platform sides
+                    ctx.fillStyle = '#663300';
+                    ctx.fillRect(platform.x, platform.y, 2, platform.height);
+                    ctx.fillRect(platform.x + platform.width - 2, platform.y, 2, platform.height);
+                }
+            }
+            
+            // Draw spells
+            for (const spell of gameState.spells) {
+                if (
+                    spell.x + spell.width < gameState.camera.x || 
+                    spell.x > gameState.camera.x + canvas.width
+                ) {
+                    continue;
+                }
+                
+                // Determine spell colors
+                const spellOuterColor = spell.type === 'fire' ? COLORS.SPELL_FIRE_OUTER : COLORS.SPELL_ICE_OUTER;
+                const spellPrimaryColor = spell.type === 'fire' ? COLORS.SPELL_FIRE_PRIMARY : COLORS.SPELL_ICE_PRIMARY;
+                const spellCoreColor = spell.type === 'fire' ? COLORS.SPELL_FIRE_CORE : COLORS.SPELL_ICE_CORE;
+                
+                // Draw spell base
+                ctx.fillStyle = spellOuterColor;
+                
+                // Draw spell based on direction
+                if (spell.velocityX > 0) {
+                    // Moving right - teardrop shape
+                    ctx.beginPath();
+                    ctx.moveTo(spell.x, spell.y);
+                    ctx.lineTo(spell.x + spell.width, spell.y + spell.height / 2);
+                    ctx.lineTo(spell.x, spell.y + spell.height);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    // Moving left - teardrop shape
+                    ctx.beginPath();
+                    ctx.moveTo(spell.x + spell.width, spell.y);
+                    ctx.lineTo(spell.x, spell.y + spell.height / 2);
+                    ctx.lineTo(spell.x + spell.width, spell.y + spell.height);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                
+                // Inner spell body
+                ctx.fillStyle = spellPrimaryColor;
+                if (spell.velocityX > 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(spell.x + 2, spell.y + 2);
+                    ctx.lineTo(spell.x + spell.width - 2, spell.y + spell.height / 2);
+                    ctx.lineTo(spell.x + 2, spell.y + spell.height - 2);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(spell.x + spell.width - 2, spell.y + 2);
+                    ctx.lineTo(spell.x + 2, spell.y + spell.height / 2);
+                    ctx.lineTo(spell.x + spell.width - 2, spell.y + spell.height - 2);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                
+                // Spell core
+                ctx.fillStyle = spellCoreColor;
+                if (spell.velocityX > 0) {
+                    // Pulsing core based on frame
+                    const pulseSize = spell.frame % 2 === 0 ? 0 : 1;
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        spell.x + spell.width / 2 + 2, 
+                        spell.y + spell.height / 2, 
+                        3 + pulseSize, 
+                        2 + pulseSize, 
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                } else {
+                    // Pulsing core based on frame
+                    const pulseSize = spell.frame % 2 === 0 ? 0 : 1;
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        spell.x + spell.width / 2 - 2, 
+                        spell.y + spell.height / 2, 
+                        3 + pulseSize, 
+                        2 + pulseSize, 
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+                
+                // Add glow effect
+                ctx.globalAlpha = 0.5;
+                ctx.beginPath();
+                ctx.arc(
+                    spell.x + (spell.velocityX > 0 ? spell.width / 2 : spell.width / 2), 
+                    spell.y + spell.height / 2, 
+                    spell.width / 2 + 4, 
+                    0, Math.PI * 2
+                );
+                ctx.fillStyle = spellPrimaryColor;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+            
+            // Draw enemies
+            for (const enemy of gameState.enemies) {
+                // Only draw enemies that are visible
+                if (
+                    enemy.x + enemy.width < gameState.camera.x || 
+                    enemy.x > gameState.camera.x + canvas.width
+                ) {
+                    continue;
+                }
+                
+                if (enemy.type === 'goblin') {
+                    drawGoblin(enemy);
+                } else {
+                    drawOrc(enemy);
+                }
+            }
+            
+            // Draw player
+            ctx.save();
+            
+            // Blinking effect when invulnerable
+            if (player.invulnerable > 0 && Math.floor(player.invulnerable / 5) % 2 === 0) {
+                ctx.globalAlpha = 0.5;
+            }
+            
+            drawWizard(player);
+            ctx.restore();
+            
+            // Draw particles
+            for (const particle of gameState.particles) {
+                ctx.fillStyle = particle.color;
+                ctx.globalAlpha = particle.life / 30;
+                
+                // For fire spell particles, make them flicker
+                if (particle.color === COLORS.SPELL_FIRE_PRIMARY || 
+                    particle.color === COLORS.SPELL_FIRE_CORE) {
+                    ctx.globalAlpha *= 0.7 + Math.random() * 0.3;
+                }
+                
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+            
+            // Restore context
+            ctx.restore();
+        }
+        
+        function drawBackground() {
+            // Sky gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#000044');
+            gradient.addColorStop(1, '#000033');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Stars
+            ctx.fillStyle = '#FFFFFF';
+            for (let i = 0; i < 100; i++) {
+                const x = (i * 53 + gameState.camera.x / 10) % canvas.width;
+                const y = (i * 47) % canvas.height;
+                const size = i % 3 === 0 ? 2 : 1;
+                ctx.fillRect(x, y, size, size);
+            }
+            
+            // Mountains in background
+            ctx.fillStyle = '#222244';
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height);
+            
+            for (let x = 0; x < canvas.width; x += 50) {
+                const adjustedX = (x + gameState.camera.x / 5) % (canvas.width + 100) - 50;
+                const height = Math.sin(x / 100) * 50 + 100;
+                ctx.lineTo(adjustedX, canvas.height - height);
+            }
+            
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.fill();
+        }
+        
+        function drawWizard(wizard) {
+            const { x, y, width, height, facingRight, frame, isJumping } = wizard;
+            
+            // Animation offsets for "bobbing" while moving
+            const bobOffset = !isJumping && frame % 4 > 1 ? 1 : 0;
+            
+            // Draw robe (body)
+            // Main robe
+            ctx.fillStyle = COLORS.WIZARD_ROBE_PRIMARY;
+            ctx.fillRect(x + 2, y + 12, width - 4, height - 14);
+            
+            // Robe highlights 
+            ctx.fillStyle = COLORS.WIZARD_ROBE_HIGHLIGHT;
+            ctx.fillRect(x + 4, y + 12, 2, height - 14);
+            
+            // Robe shadows
+            ctx.fillStyle = COLORS.WIZARD_ROBE_SHADOW;
+            ctx.fillRect(x + width - 6, y + 12, 2, height - 14);
+            
+            // Robe bottom trim
+            ctx.fillStyle = COLORS.WIZARD_ROBE_SHADOW;
+            ctx.fillRect(x + 2, y + height - 4, width - 4, 2);
+            
+            // Draw head
+            ctx.fillStyle = COLORS.WIZARD_SKIN_LIGHT;
+            ctx.fillRect(x + 6, y + 6, 12, 8);
+            
+            // Face details (depends on direction)
+            if (facingRight) {
+                // Face shadow
+                ctx.fillStyle = COLORS.WIZARD_SKIN_SHADOW;
+                ctx.fillRect(x + 14, y + 6, 4, 8);
+                
+                // Eye
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(x + 14, y + 8, 2, 2);
+                
+                // Beard
+                ctx.fillStyle = COLORS.WIZARD_BEARD;
+                ctx.fillRect(x + 8, y + 12, 10, 4);
+                ctx.fillRect(x + 10, y + 16, 6, 2);
+            } else {
+                // Face shadow
+                ctx.fillStyle = COLORS.WIZARD_SKIN_SHADOW;
+                ctx.fillRect(x + 6, y + 6, 4, 8);
+                
+                // Eye
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(x + 8, y + 8, 2, 2);
+                
+                // Beard
+                ctx.fillStyle = COLORS.WIZARD_BEARD;
+                ctx.fillRect(x + 6, y + 12, 10, 4);
+                ctx.fillRect(x + 8, y + 16, 6, 2);
+            }
+            
+            // Draw wizard hat
+            // Hat base
+            ctx.fillStyle = COLORS.WIZARD_HAT_PRIMARY;
+            ctx.fillRect(x + 3, y + 2, 18, 4);
+            
+            // Hat trim with gold
+            ctx.fillStyle = COLORS.WIZARD_HAT_TRIM;
+            ctx.fillRect(x + 3, y + 5, 18, 1);
+            
+            // Hat top
+            ctx.fillStyle = COLORS.WIZARD_HAT_PRIMARY;
+            ctx.fillRect(x + 6, y - 6, 12, 8);
+            
+            // Hat tip bend (depends on movement)
+            ctx.fillStyle = COLORS.WIZARD_HAT_PRIMARY;
+            if (frame % 4 > 1) {
+                // Hat tip bent slightly one way
+                ctx.fillRect(x + 14, y - 10, 6, 4);
+                
+                // Hat tip highlight
+                ctx.fillStyle = COLORS.WIZARD_HAT_TRIM;
+                ctx.fillRect(x + 18, y - 8, 2, 2);
+            } else {
+                // Hat tip bent slightly other way
+                ctx.fillRect(x + 12, y - 10, 6, 4);
+                
+                // Hat tip highlight
+                ctx.fillStyle = COLORS.WIZARD_HAT_TRIM;
+                ctx.fillRect(x + 16, y - 8, 2, 2);
+            }
+            
+            // Draw staff
+            if (facingRight) {
+                // Staff wood
+                ctx.fillStyle = COLORS.WIZARD_STAFF_WOOD;
+                ctx.fillRect(x + width, y + 10 + bobOffset, 10, 4);
+                ctx.fillRect(x + width + 3, y + 6 + bobOffset, 4, 16);
+                
+                // Staff top ornament
+                ctx.fillStyle = COLORS.WIZARD_STAFF_GOLD;
+                ctx.fillRect(x + width + 2, y + 2 + bobOffset, 6, 4);
+                
+                // Staff gem
+                ctx.fillStyle = player.spellType === 'fire' ? COLORS.SPELL_FIRE_CORE : COLORS.SPELL_ICE_CORE;
+                ctx.fillRect(x + width + 3, y - 2 + bobOffset, 4, 4);
+                
+                // Draw spell glow at staff tip
+                ctx.fillStyle = player.spellType === 'fire' ? COLORS.SPELL_FIRE_PRIMARY : COLORS.SPELL_ICE_PRIMARY;
+                ctx.globalAlpha = 0.7;
+                ctx.beginPath();
+                ctx.arc(x + width + 5, y, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Inner glow
+                ctx.fillStyle = player.spellType === 'fire' ? COLORS.SPELL_FIRE_CORE : COLORS.SPELL_ICE_CORE;
+                ctx.globalAlpha = 0.9;
+                ctx.beginPath();
+                ctx.arc(x + width + 5, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            } else {
+                // Staff wood
+                ctx.fillStyle = COLORS.WIZARD_STAFF_WOOD;
+                ctx.fillRect(x - 10, y + 10 + bobOffset, 10, 4);
+                ctx.fillRect(x - 7, y + 6 + bobOffset, 4, 16);
+                
+                // Staff top ornament
+                ctx.fillStyle = COLORS.WIZARD_STAFF_GOLD;
+                ctx.fillRect(x - 8, y + 2 + bobOffset, 6, 4);
+                
+                // Staff gem
+                ctx.fillStyle = player.spellType === 'fire' ? COLORS.SPELL_FIRE_CORE : COLORS.SPELL_ICE_CORE;
+                ctx.fillRect(x - 7, y - 2 + bobOffset, 4, 4);
+                
+                // Draw spell glow at staff tip
+                ctx.fillStyle = player.spellType === 'fire' ? COLORS.SPELL_FIRE_PRIMARY : COLORS.SPELL_ICE_PRIMARY;
+                ctx.globalAlpha = 0.7;
+                ctx.beginPath();
+                ctx.arc(x - 5, y, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Inner glow
+                ctx.fillStyle = player.spellType === 'fire' ? COLORS.SPELL_FIRE_CORE : COLORS.SPELL_ICE_CORE;
+                ctx.globalAlpha = 0.9;
+                ctx.beginPath();
+                ctx.arc(x - 5, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+            
+            // Draw boots/feet when running
+            if (!isJumping) {
+                ctx.fillStyle = COLORS.WIZARD_BOOTS;
+                
+                if (frame % 4 === 0) {
+                    // Right foot forward
+                    ctx.fillRect(x + 4, y + height - 6, 8, 6);
+                    ctx.fillRect(x + width - 12, y + height - 4, 8, 4);
+                } else if (frame % 4 === 1) {
+                    // Transition
+                    ctx.fillRect(x + 6, y + height - 5, 6, 5);
+                    ctx.fillRect(x + width - 12, y + height - 5, 6, 5);
+                } else if (frame % 4 === 2) {
+                    // Left foot forward
+                    ctx.fillRect(x + 4, y + height - 4, 8, 4);
+                    ctx.fillRect(x + width - 12, y + height - 6, 8, 6);
+                } else {
+                    // Transition
+                    ctx.fillRect(x + 6, y + height - 5, 6, 5);
+                    ctx.fillRect(x + width - 12, y + height - 5, 6, 5);
+                }
+            } else {
+                // Draw boots in jumping position
+                ctx.fillStyle = COLORS.WIZARD_BOOTS;
+                ctx.fillRect(x + 5, y + height - 5, 6, 5);
+                ctx.fillRect(x + width - 11, y + height - 5, 6, 5);
+            }
+        }
+        
+        function drawGoblin(goblin) {
+            const { x, y, width, height, frame, velocityX } = goblin;
+            const facingRight = velocityX > 0;
+            
+            // Animation offsets for "bobbing" while moving
+            const bobOffset = frame % 2 === 0 ? 1 : 0;
+            
+            // Draw body/clothes
+            // Main tunic
+            ctx.fillStyle = COLORS.GOBLIN_CLOTHES_PRIMARY;
+            ctx.fillRect(x + 2, y + 10, width - 4, height - 12);
+            
+            // Tunic highlights
+            ctx.fillStyle = COLORS.GOBLIN_CLOTHES_ACCENT;
+            ctx.fillRect(x + 2, y + 10, width - 4, 2);
+            
+            // Belt
+            ctx.fillStyle = COLORS.GOBLIN_CLOTHES_ACCENT;
+            ctx.fillRect(x + 2, y + height - 10, width - 4, 2);
+            
+            // Draw head
+            ctx.fillStyle = COLORS.GOBLIN_SKIN_PRIMARY;
+            ctx.fillRect(x + 4, y + 1, width - 8, 9);
+            
+            // Chin/jaw
+            ctx.fillStyle = COLORS.GOBLIN_SKIN_PRIMARY;
+            if (facingRight) {
+                ctx.fillRect(x + 10, y + 10, 6, 2);
+            } else {
+                ctx.fillRect(x + 8, y + 10, 6, 2);
+            }
+            
+            // Draw face details (eyes, nose, etc.)
+            if (facingRight) {
+                // Face shadow
+                ctx.fillStyle = COLORS.GOBLIN_SKIN_SHADOW;
+                ctx.fillRect(x + 12, y + 3, 6, 5);
+                
+                // Eyes
+                ctx.fillStyle = COLORS.GOBLIN_EYES;
+                ctx.fillRect(x + 14, y + 4, 2, 3);
+                
+                // Nose
+                ctx.fillStyle = COLORS.GOBLIN_SKIN_SHADOW;
+                ctx.fillRect(x + 16, y + 7, 3, 2);
+                
+                // Teeth/mouth
+                ctx.fillStyle = COLORS.GOBLIN_TEETH;
+                ctx.fillRect(x + 13, y + 10, 2, 1);
+                ctx.fillRect(x + 15, y + 10, 1, 2);
+            } else {
+                // Face shadow
+                ctx.fillStyle = COLORS.GOBLIN_SKIN_SHADOW;
+                ctx.fillRect(x + 6, y + 3, 6, 5);
+                
+                // Eyes
+                ctx.fillStyle = COLORS.GOBLIN_EYES;
+                ctx.fillRect(x + 8, y + 4, 2, 3);
+                
+                // Nose
+                ctx.fillStyle = COLORS.GOBLIN_SKIN_SHADOW;
+                ctx.fillRect(x + 5, y + 7, 3, 2);
+                
+                // Teeth/mouth
+                ctx.fillStyle = COLORS.GOBLIN_TEETH;
+                ctx.fillRect(x + 9, y + 10, 2, 1);
+                ctx.fillRect(x + 8, y + 10, 1, 2);
+            }
+            
+            // Draw ears (pointy)
+            ctx.fillStyle = COLORS.GOBLIN_SKIN_PRIMARY;
+            // Left ear
+            ctx.beginPath();
+            ctx.moveTo(x + 3, y + 4);
+            ctx.lineTo(x, y + 1);
+            ctx.lineTo(x + 3, y + 7);
+            ctx.fill();
+            
+            // Right ear
+            ctx.beginPath();
+            ctx.moveTo(x + width - 3, y + 4);
+            ctx.lineTo(x + width, y + 1);
+            ctx.lineTo(x + width - 3, y + 7);
+            ctx.fill();
+            
+            // Ear highlights
+            ctx.fillStyle = COLORS.GOBLIN_SKIN_HIGHLIGHT;
+            ctx.fillRect(x + 1, y + 2, 1, 3);
+            ctx.fillRect(x + width - 2, y + 2, 1, 3);
+            
+            // Draw weapon (knife)
+            if (facingRight) {
+                ctx.fillStyle = COLORS.GOBLIN_CLOTHES_SHADOW;
+                ctx.fillRect(x + width - 2, y + 14 + bobOffset, 6, 2);
+                
+                // Blade
+                ctx.fillStyle = '#CCCCCC';
+                ctx.fillRect(x + width + 4, y + 13 + bobOffset, 4, 3);
+                ctx.fillRect(x + width + 8, y + 12 + bobOffset, 2, 2);
+            } else {
+                ctx.fillStyle = COLORS.GOBLIN_CLOTHES_SHADOW;
+                ctx.fillRect(x - 4, y + 14 + bobOffset, 6, 2);
+                
+                // Blade
+                ctx.fillStyle = '#CCCCCC';
+                ctx.fillRect(x - 8, y + 13 + bobOffset, 4, 3);
+                ctx.fillRect(x - 10, y + 12 + bobOffset, 2, 2);
+            }
+            
+            // Draw legs/feet
+            ctx.fillStyle = COLORS.GOBLIN_CLOTHES_SHADOW;
+            
+            if (frame % 4 === 0) {
+                // Right foot forward
+                ctx.fillRect(x + 4, y + height - 8, 6, 8);
+                ctx.fillRect(x + width - 10, y + height - 4, 6, 4);
+            } else if (frame % 4 === 1) {
+                // Transition
+                ctx.fillRect(x + 5, y + height - 6, 5, 6);
+                ctx.fillRect(x + width - 10, y + height - 6, 5, 6);
+            } else if (frame % 4 === 2) {
+                // Left foot forward
+                ctx.fillRect(x + 4, y + height - 4, 6, 4);
+                ctx.fillRect(x + width - 10, y + height - 8, 6, 8);
+            } else {
+                // Transition
+                ctx.fillRect(x + 5, y + height - 6, 5, 6);
+                ctx.fillRect(x + width - 10, y + height - 6, 5, 6);
+            }
+        }
+        
+        function drawOrc(orc) {
+            const { x, y, width, height, frame, velocityX } = orc;
+            const facingRight = velocityX > 0;
+            
+            // Animation offsets for "bobbing" while moving
+            const bobOffset = frame % 2 === 0 ? 1 : 0;
+            
+            // Draw body/armor
+            // Main armor body
+            ctx.fillStyle = COLORS.ORC_ARMOR_PRIMARY;
+            ctx.fillRect(x + 3, y + 14, width - 6, height - 18);
+            
+            // Armor plates
+            ctx.fillStyle = COLORS.ORC_ARMOR_METAL;
+            ctx.fillRect(x + 3, y + 18, width - 6, 4);
+            ctx.fillRect(x + 3, y + 26, width - 6, 4);
+            ctx.fillRect(x + 3, y + 34, width - 6, 4);
+            
+            // Shoulder pads
+            ctx.fillStyle = COLORS.ORC_ARMOR_SHADOW;
+            ctx.fillRect(x, y + 14, 6, 8);
+            ctx.fillRect(x + width - 6, y + 14, 6, 8);
+            
+            // Belt
+            ctx.fillStyle = COLORS.ORC_BELT;
+            ctx.fillRect(x + 2, y + height - 22, width - 4, 4);
+            
+            // Draw head
+            ctx.fillStyle = COLORS.ORC_SKIN_PRIMARY;
+            ctx.fillRect(x + 5, y, width - 10, 14);
+            
+            // Head/jaw additional parts
+            ctx.fillStyle = COLORS.ORC_SKIN_PRIMARY;
+            ctx.fillRect(x + 8, y + 14, width - 16, 4);
+            
+            // Draw face details
+            if (facingRight) {
+                // Face shadows
+                ctx.fillStyle = COLORS.ORC_SKIN_SHADOW;
+                ctx.fillRect(x + 15, y + 2, 7, 10);
+                
+                // Brow
+                ctx.fillStyle = COLORS.ORC_SKIN_SHADOW;
+                ctx.fillRect(x + 15, y + 2, 7, 3);
+                
+                // Eyes (glowing)
+                ctx.fillStyle = COLORS.ORC_EYES;
+                ctx.fillRect(x + 18, y + 4, 4, 4);
+                
+                // Eye highlight
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(x + 19, y + 5, 1, 1);
+                
+                // Nose
+                ctx.fillStyle = COLORS.ORC_SKIN_SHADOW;
+                ctx.fillRect(x + 20, y + 9, 3, 3);
+                
+                // Mouth
+                ctx.fillStyle = '#330000';
+                ctx.fillRect(x + 13, y + 14, 7, 2);
+                
+                // Tusks
+                ctx.fillStyle = COLORS.ORC_TEETH;
+                ctx.fillRect(x + 10, y + 12, 3, 6);
+                ctx.fillRect(x + 20, y + 12, 3, 6);
+            } else {
+                // Face shadows
+                ctx.fillStyle = COLORS.ORC_SKIN_SHADOW;
+                ctx.fillRect(x + 8, y + 2, 7, 10);
+                
+                // Brow
+                ctx.fillStyle = COLORS.ORC_SKIN_SHADOW;
+                ctx.fillRect(x + 8, y + 2, 7, 3);
+                
+                // Eyes (glowing)
+                ctx.fillStyle = COLORS.ORC_EYES;
+                ctx.fillRect(x + 8, y + 4, 4, 4);
+                
+                // Eye highlight
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(x + 10, y + 5, 1, 1);
+                
+                // Nose
+                ctx.fillStyle = COLORS.ORC_SKIN_SHADOW;
+                ctx.fillRect(x + 7, y + 9, 3, 3);
+                
+                // Mouth
+                ctx.fillStyle = '#330000';
+                ctx.fillRect(x + 10, y + 14, 7, 2);
+                
+                // Tusks
+                ctx.fillStyle = COLORS.ORC_TEETH;
+                ctx.fillRect(x + 7, y + 12, 3, 6);
+                ctx.fillRect(x + 17, y + 12, 3, 6);
+            }
+            
+            // Draw weapon (axe)
+            if (facingRight) {
+                // Handle
+                ctx.fillStyle = COLORS.WIZARD_STAFF_WOOD;
+                ctx.fillRect(x + width + 1, y + 22 + bobOffset, 4, 18);
+                
+                // Axe head
+                ctx.fillStyle = COLORS.ORC_ARMOR_METAL;
+                ctx.fillRect(x + width + 5, y + 18 + bobOffset, 10, 10);
+                
+                // Axe edge
+                ctx.fillStyle = '#DDDDDD';
+                ctx.fillRect(x + width + 15, y + 20 + bobOffset, 2, 6);
+                
+                // Axe details
+                ctx.fillStyle = COLORS.ORC_BELT;
+                ctx.fillRect(x + width + 5, y + 22 + bobOffset, 8, 2);
+            } else {
+                // Handle
+                ctx.fillStyle = COLORS.WIZARD_STAFF_WOOD;
+                ctx.fillRect(x - 5, y + 22 + bobOffset, 4, 18);
+                
+                // Axe head
+                ctx.fillStyle = COLORS.ORC_ARMOR_METAL;
+                ctx.fillRect(x - 15, y + 18 + bobOffset, 10, 10);
+                
+                // Axe edge
+                ctx.fillStyle = '#DDDDDD';
+                ctx.fillRect(x - 17, y + 20 + bobOffset, 2, 6);
+                
+                // Axe details
+                ctx.fillStyle = COLORS.ORC_BELT;
+                ctx.fillRect(x - 13, y + 22 + bobOffset, 8, 2);
+            }
+            
+            // Draw legs
+            ctx.fillStyle = COLORS.ORC_ARMOR_SHADOW;
+            
+            if (frame % 4 === 0) {
+                // Right foot forward
+                ctx.fillRect(x + 6, y + height - 14, 8, 14);
+                ctx.fillRect(x + width - 14, y + height - 6, 8, 6);
+            } else if (frame % 4 === 1) {
+                // Transition
+                ctx.fillRect(x + 7, y + height - 10, 6, 10);
+                ctx.fillRect(x + width - 13, y + height - 10, 6, 10);
+            } else if (frame % 4 === 2) {
+                // Left foot forward
+                ctx.fillRect(x + 6, y + height - 6, 8, 6);
+                ctx.fillRect(x + width - 14, y + height - 14, 8, 14);
+            } else {
+                // Transition
+                ctx.fillRect(x + 7, y + height - 10, 6, 10);
+                ctx.fillRect(x + width - 13, y + height - 10, 6, 10);
+            }
+            
+            // Draw boot details
+            ctx.fillStyle = COLORS.ORC_BELT;
+            ctx.fillRect(x + 6, y + height - 4, 8, 2);
+            ctx.fillRect(x + width - 14, y + height - 4, 8, 2);
+        }
+        
+        // Update UI
+        function updateUI() {
+    scoreElement.textContent = gameState.score;
+    livesElement.textContent = gameState.lives;
+    document.getElementById('level').textContent = gameState.level;
+    spellEnergyElement.style.width = player.spellEnergy + '%';
+        }
+        
+        // Initialize the game
+        initGame();
+        
+        // Start game button adds event listener
+        startButton.addEventListener('click', startGame);
+    </script>
+</body>
+</html>
