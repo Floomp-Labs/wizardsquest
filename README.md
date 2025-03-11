@@ -1,6 +1,6 @@
 🧙‍♂️ Wizard's Quest
 
-PLAY: wizardsquest.netlify.app
+PLAY: https://wizardsquest.netlify.app/
 
 A 2D pixel-art platformer game where you play as a wizard battling through increasingly difficult levels filled with goblins and orcs.
 Show Image
@@ -24,7 +24,7 @@ X Key: Switch between fire and ice spells
 Getting Started
 
 Clone the repository:
-Copygit clone https://github.com/yourusername/wizards-quest.git
+Copygit clone https://github.com/yourusername/wizardsquest.git
 
 Open index.html in your browser to play the game.
 
